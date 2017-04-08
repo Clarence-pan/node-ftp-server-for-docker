@@ -1,0 +1,6 @@
+--declaration
+--outDir ./lib 
+--rootDir ./src 
+ src/cli.ts 
+ src/docker.ts 
+ src/ftp-server.ts
