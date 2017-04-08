@@ -20,11 +20,13 @@
   ],
   "files": [
     "index.js",
+    "cli.js",
+    "extract-es-module.js",
     "lib/ftp-server.js",
     "lib/docker.js",
     "lib/cli.js"
   ],
-  "bin": "./lib/cli.js",
+  "bin": "./cli.js",
   "author": "clarencep",
   "license": "ISC",
   "bugs": {

@@ -1,1 +1,6 @@
-console.log("Hello!")
+
+
+export default function(){
+    console.log("Hello!")
+    console.log("This project is developing...")
+}

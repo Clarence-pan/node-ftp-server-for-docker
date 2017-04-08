@@ -1,1 +1,1 @@
-module.exports = require('./lib/ftp-server')
+module.exports = require('./extract-es-module')(require('./lib/ftp-server'))
