@@ -19,10 +19,10 @@
     "container"
   ],
   "files": [
-    "./index.js",
-    "./lib/ftp-server.js",
-    "./lib/docker.js",
-    "./lib/cli.js"
+    "index.js",
+    "lib/ftp-server.js",
+    "lib/docker.js",
+    "lib/cli.js"
   ],
   "bin": "./lib/cli.js",
   "author": "clarencep",
