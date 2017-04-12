@@ -1,1 +1,1 @@
-module.exports = require('./lib/ftp-server')
+module.exports = require('./lib/ftp-server').default

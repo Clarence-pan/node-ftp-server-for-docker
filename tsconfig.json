@@ -5,11 +5,16 @@
         "moduleResolution": "node",
         "outDir": "./lib",
         "rootDir": "./src",
-        "declaration": true
+        "declaration": true,
+        "lib": [
+            "es2015"
+        ]
     },
     "files": [
         "src/cli.ts",
-        "src/docker.ts",
-        "src/ftp-server.ts"
+        "src/ftp-server.ts",
+        "src/fs/abstract.ts",
+        "src/fs/docker.ts",
+        "src/fs/system.ts"
     ]
 }

@@ -1,0 +1,2 @@
+Hello = 你好
+World = 世界

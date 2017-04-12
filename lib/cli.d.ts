@@ -1,1 +1,2 @@
-export default function (): void;
+declare var _default: () => void;
+export = _default;
