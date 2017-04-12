@@ -4,7 +4,7 @@
   "description": "A ftp server for docker - allow accessing files in docker containers even when container already started. Based on sh and docker cp.",
   "main": "index.js",
   "scripts": {
-    "build": "./node_modules/.bin/tsc @.tsc.opts && echo OK.",
+    "build": "./node_modules/.bin/tsc -p . && echo OK.",
     "test": "mocha",
     "coverage": "istanbul cover ./node_modules/mocha/bin/_mocha"
   },
@@ -23,8 +23,11 @@
     "cli.js",
     "extract-es-module.js",
     "lib/ftp-server.js",
+    "lib/ftp-server.d.ts",
     "lib/docker.js",
-    "lib/cli.js"
+    "lib/docker.d.ts",
+    "lib/cli.js",
+    "lib/cli.d.ts"
   ],
   "bin": "./cli.js",
   "author": "clarencep",

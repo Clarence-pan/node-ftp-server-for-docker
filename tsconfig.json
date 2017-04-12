@@ -1,8 +1,15 @@
 {
     "compilerOptions": {
-        "target": "es6"
+        "target": "es6",
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "outDir": "./lib",
+        "rootDir": "./src",
+        "declaration": true
     },
-    "include": [
-        "src/*.ts"
+    "files": [
+        "src/cli.ts",
+        "src/docker.ts",
+        "src/ftp-server.ts"
     ]
 }
