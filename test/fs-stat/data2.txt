@@ -1,0 +1,32 @@
+  File: 'tmp'
+  Size: 4096      	Blocks: 8          IO Block: 4096   directory
+Device: ca01h/51713d	Inode: 551605      Links: 9
+Access: (0775/drwxrwxr-x)  Uid: ( 1000/clarence)   Gid: ( 1000/clarence)
+Access: 2016-12-06 14:32:42.167137839 +0800
+Modify: 2017-04-07 11:49:32.953246467 +0800
+Change: 2017-04-07 11:49:32.953246467 +0800
+ Birth: -
+-------------------------------------------------
+{
+    isFile: false,
+    isDirectory: true,
+    isBlockDevice: false,
+    isCharacterDevice: false,
+    isSymbolicLink: false,
+    isFIFO: false,
+    isSocket: false,
+    dev: 0,
+    ino: 551605,
+    mode: 0o0775,
+    nlink: 9,
+    uid: 1000,
+    gid: 1000,
+    rdev: 0,
+    size: 4096,
+    blksize: 4096,
+    blocks: 8,
+    atime: '2016-12-06T06:32:42.167Z',
+    mtime: '2017-04-07T03:49:32.953Z',
+    ctime: '2017-04-07T03:49:32.953Z',
+    birthtime: null
+}

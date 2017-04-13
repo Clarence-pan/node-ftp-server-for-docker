@@ -27,7 +27,7 @@ describe("Sample Test", function () {
     })
 })
 
-describe("Simple ftp-server for test user", function () {
+describe.skip("Simple ftp-server for test user", function () {
     const FTP_ROOT = path.join(__dirname, '../test-data')
     let ftpd = null
     let ftpClient = null
@@ -35,7 +35,6 @@ describe("Simple ftp-server for test user", function () {
     it.skip("server should start", function () {
 
         ftpd = new FtpServer({
-            rootPath: FTP_ROOT,
             users: [
                 {
                     name: 'test',
@@ -55,10 +54,9 @@ describe("Simple ftp-server for test user", function () {
         })
 
         return new Promise(function (resolve, reject) {
-            ftpd
-                .on('listening', function () {
-                    resolve()
-                })
+            ftpd.on('listening', function () {
+                resolve()
+            })
 
             ftpd.on('error', function (err) {
                 reject(err)

@@ -27,3 +27,7 @@ It is a ftp server for docker - allow accessing files in docker containers even 
 [download-image]: https://img.shields.io/npm/dm/ftp-server-for-docker.svg?style=flat-square
 [download-url]: https://npmjs.org/package/ftp-server-for-docker
 
+
+TODO:
+
+- windows下中文支持有问题 -- 创建的文件名乱码

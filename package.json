@@ -4,8 +4,8 @@
   "description": "A ftp server for docker - allow accessing files in docker containers even when container already started. Based on sh and docker cp.",
   "main": "index.js",
   "scripts": {
-    "build": "./node_modules/.bin/tsc -p . && echo OK.",
-    "watch": "./node_modules/.bin/tsc -p . --watch",
+    "build": "./node_modules/.bin/tsc --project . && echo OK.",
+    "watch": "./node_modules/.bin/tsc --project . --watch",
     "test": "mocha",
     "coverage": "istanbul cover ./node_modules/mocha/bin/_mocha"
   },
@@ -51,6 +51,7 @@
     "babel-preset-stage-2": "^6.24.1",
     "co": "^4.6.0",
     "ftp": "^0.3.10",
+    "glob": "^7.1.1",
     "intelli-espower-loader": "^1.0.1",
     "istanbul": "^0.4.5",
     "mocha": "^3.2.0",
@@ -60,6 +61,7 @@
   "dependencies": {
     "bluebird": "^3.5.0",
     "cb2p": "^1.1.0",
-    "ftpd": "^0.2.15"
+    "ftpd": "^0.2.15",
+    "tmp": "0.0.31"
   }
 }
