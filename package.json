@@ -22,15 +22,10 @@
   "files": [
     "index.js",
     "cli.js",
-    "extract-es-module.js",
     "lib/ftp-server.js",
     "lib/ftp-server.d.ts",
-    "lib/fs/abstract.js",
-    "lib/fs/abstract.d.ts",
-    "lib/fs/docker.js",
-    "lib/fs/docker.d.ts",
-    "lib/fs/system.js",
-    "lib/fs/system.d.ts",
+    "lib/docker-fs.js",
+    "lib/docker-fs.d.ts",
     "lib/cli.js",
     "lib/cli.d.ts"
   ],
