@@ -376,7 +376,7 @@ export function readdir(path : string | Buffer, callback?: (err : NodeJS.ErrnoEx
     ~(async function () {
         if (isRoot(path)){
             let res = await shellExec(['docker', 'ps', '--format', '{{.Names}}'])
-            callback(null, res.stdout.split('\n').map(line => line.trim()))
+            callback(null, splitIntoLines(res.stdout))
             return
         }
 
@@ -386,7 +386,7 @@ export function readdir(path : string | Buffer, callback?: (err : NodeJS.ErrnoEx
         // 2. 执行shell删除目录
         let res = await container.shellExec(['ls', '-1', '--color=none', pathInContainer])
 
-        callback(null, res.stdout.split("\n").map(line => line.trim()))
+        callback(null, splitIntoLines(res.stdout))
     })().catch(err => callback(err as Error, []))
 }
 
@@ -523,7 +523,7 @@ const RE_changeTime = /Change:\s+\d{4}-\d{2}/
 const RE_birthTime = /Birth:\s+\d{4}-\d{2}/
 
 export function parseShellStatOutputToFsStats(shellStatOutput : string) : fs.Stats {
-    let lines = shellStatOutput.split("\n").map(line => line.trim())
+    let lines = splitIntoLines(shellStatOutput)
 
     let stat: fs.Stats = {
         isFile: () => false,
@@ -605,4 +605,8 @@ export function parseShellStatOutputToFsStats(shellStatOutput : string) : fs.Sta
     });
 
     return stat
+}
+
+function splitIntoLines(content: string): string[]{
+    return content.split("\n").map(x => x.trim()).filter(x => !!x)
 }
