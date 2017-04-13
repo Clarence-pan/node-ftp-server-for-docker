@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import * as cb2p from 'cb2p'
+import * as path from 'path'
 import * as tmp from 'tmp'
 import {shellExec, ShellExecOptions, ShellExecResult, shellEscape} from './shell'
 import * as stream from 'stream'
@@ -493,10 +494,20 @@ export class DockerContainerManager {
 export const dockerContainerManager = new DockerContainerManager()
 
 /**
+ * The directory for all temporary files.
+ */
+let TempDirName = null
+
+/**
  * 生成临时文件名字
  */
 function generateTempFileName() : string {
-    return tmp.tmpNameSync()
+    if (!TempDirName){
+        let tmpDir = tmp.dirSync({prefix: 'docker-fs-'})
+        TempDirName = tmpDir.name
+    }
+
+    return tmp.tmpNameSync({dir: TempDirName})
 }
 
 //  Size: 12              Blocks: 1          IO Block: 65536  regular file Size:

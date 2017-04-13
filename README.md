@@ -31,3 +31,7 @@ It is a ftp server for docker - allow accessing files in docker containers even 
 TODO:
 
 - windows下中文支持有问题 -- 创建的文件名乱码
+- cli 的命令行参数设计？
+- cli 的配置文件设计？
+- 下载文件出错
+- 上传文件出错
