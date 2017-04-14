@@ -2,6 +2,8 @@
 
 **DEVELOPING**
 
+这是一个 docker 专用的 FTP 服务器 - 允许通过 FTP 协议来访问 docker 容器中的文件（即使 docker 容器已经启动了也可以的哟）。基于 linux shell `sh` 和 docker 的 `docker cp`.
+
 It is a ftp server for docker - allow accessing files in docker containers even when container already started. Based on `sh` and `docker cp`.
 
 [![NPM version][npm-image]][npm-url]
@@ -27,11 +29,50 @@ It is a ftp server for docker - allow accessing files in docker containers even 
 [download-image]: https://img.shields.io/npm/dm/ftp-server-for-docker.svg?style=flat-square
 [download-url]: https://npmjs.org/package/ftp-server-for-docker
 
+## 安装 Install
 
-TODO:
+```
+npm install -g ftp-server-for-docker
 
-- windows下中文支持有问题 -- 创建的文件名乱码
-- cli 的命令行参数设计？
-- cli 的配置文件设计？
-- 下载文件出错
-- 上传文件出错
+```
+
+## 运行 Run the server
+
+### 示例 Example
+
+在 `localhost:21` 上启动 FTP 服务器，并运行 `test` 用户通过密码 `123456` 来访问。
+Start the FTP server on `localhost:21` and allow user `test` access by password `123456`
+
+```
+$ ftp-server-for-docker -H localhost -p 21 --users test:123456
+FtpServer start listening at localhost:21
+```
+
+### 查看命令行帮助 Find CLI help
+
+```
+$ ftp-server-for-docker --help
+Usage: ftp-server-for-docker [options]
+
+Options:
+  --port, -p       Specify which port to listen on(default is 21)       [number]
+  --host, -H       Specify which host to bind(default is 0.0.0.0)       [string]
+  --annoymous, -a  Whether enable annoymous user                       [boolean]
+  --users, -u      Specify users (in form like username:password, can be
+                   multiple)                                             [array]
+  --config, -c     Specify which configuration file to use
+  --debug          Whether enable debug mode                           [boolean]
+  -h, --help       Show help                                           [boolean]
+  -?, --help       Show help                                           [boolean]
+
+Examples:
+  ftp-server-for-docker -h localhost -p 21  Start the FTP Server on
+  -u test:123                               localhost:21, allow user `test` to
+                                            access.
+
+```
+
+## 已知问题 Known Issues
+
+- windows 下中文目录/文件名会乱码
+- 被动模式传输有问题（建议切换到主动模式）
