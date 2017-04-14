@@ -29,9 +29,9 @@ It is a ftp server for docker - allow accessing files in docker containers even 
 
 ## 运行依赖 Requirements
 
-- [x] Node.js <= 5.x      - Not tested
-- [√] Node.js 6.x         - Tested
-- [x] Node.js >= 7.x      - Not tested
+- [ ] Node.js  5.x      **Not tested**
+- [x] Node.js 6.x       **Tested**
+- [ ] Node.js 7.x       **Not tested**
 
 ## 安装 Install
 
