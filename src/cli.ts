@@ -8,19 +8,23 @@ export = function(argv?: string[]){
     argv = argv || process.argv
 
     let args = yargs
+        .strict()
         .usage('Usage: $0 [options]')
-        .example('$0 -h localhost -p 21 -u test:123 foo:bar', 'Start the FTP Server on localhost:21, allow user `test` and `foo` to access.')
+        .example('$0 -h localhost -p 21 -u test:123', 'Start the FTP Server on localhost:21, allow user `test` to access.')
         .option('port', {
             alias: 'p',
             describe: 'Specify which port to listen on(default is 21)',
+            type: 'number',
         })
         .option('host', {
-            alias: 'h',
+            alias: 'H',
             describe: 'Specify which host to bind(default is 0.0.0.0)',
+            type: 'string',
         })
         .option('annoymous', {
             alias: 'a',
             describe: 'Whether enable annoymous user',
+            type: 'boolean',
         })
         .options('users', {
             alias: 'u',
@@ -36,11 +40,15 @@ export = function(argv?: string[]){
             boolean: true,
         })
         .help('help')
+        .alias('h', 'help')
+        .alias('?', 'help')
         .parse(argv)
 
     if (args.debug){
         process.env.DEBUG = '*'
     }
+
+    
 
     let options: FtpServerOptions = {}
 
