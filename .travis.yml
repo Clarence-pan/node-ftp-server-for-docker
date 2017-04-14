@@ -12,6 +12,8 @@ install:
 
 script:
   - npm run coverage
+  - npm install -g ftp-server-for-docker
+  - ftp-server-for-docker --help
 
 after_script:
   - npm install codecov && codecov

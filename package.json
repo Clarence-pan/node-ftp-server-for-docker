@@ -22,6 +22,10 @@
   "files": [
     "index.js",
     "cli.js",
+    "lib/cache.js",
+    "lib/cache.d.ts",
+    "lib/shell.js",
+    "lib/shell.d.ts",
     "lib/ftp-server.js",
     "lib/ftp-server.d.ts",
     "lib/docker-fs.js",
