@@ -45,12 +45,21 @@ npm install -g ftp-server-for-docker
 ### 示例 Example
 
 在 `localhost:21` 上启动 FTP 服务器，并运行 `test` 用户通过密码 `123456` 来访问。
+
 Start the FTP server on `localhost:21` and allow user `test` access by password `123456`
 
 ```
 $ ftp-server-for-docker -H localhost -p 21 --users test:123456
 FtpServer start listening at localhost:21
 ```
+
+### 示例2 Example2
+
+使用 `ftp-server-for-docker` 来浏览容器 `wordpress` 中的文件: 
+
+User `ftp-server-for-docker` to explore files in container `wordpress`:
+
+![](https://raw.githubusercontent.com/Clarence-pan/node-ftp-server-for-docker/master/screenshots/explore-wordpress.gif)
 
 ### 查看命令行帮助 Find CLI help
 
