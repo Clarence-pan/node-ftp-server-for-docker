@@ -42,7 +42,7 @@ export async function shellExec(cmd: string|string[], options?: ShellExecOptions
     return new Promise<ShellExecResult>(function(resolve, reject){
         let retCode: number|void = null
         let shellProc = child_process.exec(execCmd, options, function(err, stdout, stderr){
-            debug(`[${execCmd}]: end: `, {err, stdout, stderr, retCode})
+            debug(`[${execCmd}]: end:\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}\n   => ` , {err, retCode})
 
             if (err){
                 reject(err)

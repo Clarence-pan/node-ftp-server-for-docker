@@ -133,6 +133,9 @@ export function unlink(path : string | Buffer, callback?: (err?: NodeJS.ErrnoExc
         // 2. 通过sh运行 rm
         let res = await container.shellExec(['rm', '-f', pathInContainer])
 
+        // 刷新文件状态
+        container.readFileStat(pathInContainer, {refresh: true})
+
         callback(null)
     })().catch(err => callback(err as Error))
 }
@@ -158,6 +161,9 @@ export function mkdir(path : string | Buffer, mode?: number, callback?: (err?: N
 
         // 2. 通过sh运行 mkdir
         let res = await container.shellExec(['mkdir', pathInContainer])
+
+        // 刷新文件状态
+        container.readFileStat(pathInContainer, {refresh: true})
 
         callback(null)
     })().catch(err => callback(err as Error))
@@ -187,8 +193,6 @@ export function open(path : string | Buffer, flags : string | number, callback :
             callback(err, fd)
         })
     })().catch(err => callback(err as Error, 0))
-    
-    return fs.open(path, flags, callback)
 }
 
 export type CreateReadStreamOptions = {
@@ -295,13 +299,18 @@ export function createWriteStream(path : string | Buffer, options?: CreateWriteS
 
     // 3. 写入完成后，通过 docker copy 把文件上传到容器内
     localFileStream
-        .on('end', function () {
+        .on('finish', function () {
             // todo: 失败了怎么办？
             container
                 .upload(localFile, pathInContainer)
+                .then(() => {                    
+                    // 刷新文件状态
+                    container.readFileStat(pathInContainer, {refresh: true})
+                })
                 .catch(err => {
                     localFileStream.emit('error', err)
                 })
+
         }) 
 
     return localFileStream
@@ -323,8 +332,6 @@ export function readFile(filename : string, callback : (err : NodeJS.ErrnoExcept
 
         fs.readFile(localFile, callback)
     })().catch(err => callback(err as Error, null))
-
-    // return fs.readFile(filename, callback)
 }
 
 export type WriteFileOptions = {
@@ -350,10 +357,11 @@ export function writeFile(filename : string, data : any, options : WriteFileOpti
         // 3. 然后上传到容器内
         await container.upload(localFile, pathInContainer)
 
+        // 刷新文件状态
+        container.readFileStat(pathInContainer, {refresh: true})
+
         callback(null)
     })().catch(err => callback(err as Error))
-
-    // return fs.writeFile(filename, data, options, callback)
 }
 
 /**
@@ -376,10 +384,11 @@ export function rmdir(path : string | Buffer, callback?: (err?: NodeJS.ErrnoExce
         // 2. 执行shell删除目录
         await container.shellExec(['rmdir', pathInContainer])
 
+        // 刷新文件状态
+        container.readFileStat(pathInContainer, {refresh: true})
+
         callback(null)
     })().catch(err => callback(err as Error))
-
-    // return fs.rmdir(path, callback)
 }
 
 /**
@@ -391,7 +400,6 @@ export function rmdir(path : string | Buffer, callback?: (err?: NodeJS.ErrnoExce
 
 export function rename(oldPath : string, newPath : string, callback?: (err?: NodeJS.ErrnoException) => void) {
     debug('rename', {oldPath, newPath})
-    // return fs.rename(oldPath, newPath, callback)
 
     ~(async function () {
         // 1. 转换路径
@@ -409,13 +417,18 @@ export function rename(oldPath : string, newPath : string, callback?: (err?: Nod
         // 2. 执行shell删除目录
         await container1.shellExec(['mv', oldPathInContainer, newPathInContainer])
 
+        // 刷新文件状态
+        container1.readFileStat(oldPathInContainer, {refresh: true})
+        if (path.dirname(newPathInContainer) !== path.dirname(oldPathInContainer)){
+            container1.readFileStat(newPathInContainer, {refresh: true})
+        }
+
         callback(null)
     })().catch(err => callback(err as Error))
 }
 
 export function readdir(path : string | Buffer, callback?: (err : NodeJS.ErrnoException, files : string[]) => void) : void {
     debug('readdir', {path})
-    // return fs.readdir(path, callback)
     
     ~(async function () {
         if (isRoot(path)){
@@ -474,14 +487,17 @@ export class DockerContainer {
 
     }
 
-    async shellExecCached(cmd: string | string[], options?: {timeout: number}): Promise<ShellExecResult>{
-        let cacheKey = Array.isArray(cmd) ? cmd.join(' ') : cmd
-        let cachedResult = this._execCache.get(cacheKey)
-        if (cachedResult){
-            return cachedResult
-        }
+    async shellExecCached(cmd: string | string[], options?: {timeout?: number, refresh?: boolean}): Promise<ShellExecResult>{
+        options = {timeout: 3000, refresh: false, ...(options || {})}
 
-        options = {timeout: 3000, ...(options || {})}
+        let cacheKey = Array.isArray(cmd) ? cmd.join(' ') : cmd
+
+        if (!options.refresh){
+            let cachedResult = this._execCache.get(cacheKey)
+            if (cachedResult){
+                return cachedResult
+            }
+        }
 
         let result = this.shellExec(cmd)
         this._execCache.set(cacheKey, result, options.timeout)
@@ -489,14 +505,16 @@ export class DockerContainer {
         return result
     }
 
-    async readFilesStatsInDir(dir, options?: {timeout: number}): Promise<{[path:string]: fs.Stats}>{
-        let cacheKey = dir
-        let cachedResult = this._dirStatCache.get(cacheKey)
-        if (cachedResult){
-            return cachedResult
-        }
+    async readFilesStatsInDir(dir, options?: {timeout?: number, refresh?: boolean}): Promise<{[path:string]: fs.Stats}>{
+        options = {timeout: 3000, refresh: false, ...(options || {})}
 
-        options = {timeout: 3000, ...(options || {})}
+        let cacheKey = dir
+        if (!options.refresh){
+            let cachedResult = this._dirStatCache.get(cacheKey)
+            if (cachedResult){
+                return cachedResult
+            }
+        }
 
         let statCmd = 'stat ' + (dir + '/*').replace(/(^\/+)/, '/')
         let result = this.shellExecCached(['sh', '-c', statCmd ], options)
@@ -507,11 +525,11 @@ export class DockerContainer {
         return result
     }
 
-    async readFileStat(file, options?: {timeout: number}): Promise<fs.Stats>{
+    async readFileStat(file, options?: {timeout?: number, refresh?: boolean}): Promise<fs.Stats>{
         let baseDir = path.dirname(file).replace(/\\/g, '/')
         let filesStatsInBaseDir = await this.readFilesStatsInDir(baseDir, options)
         if (!filesStatsInBaseDir[file]){
-            throw new DockerFsError(`File ${file} not found in ${baseDir}!`, 'ENOET')
+            return new FsStats()
         }
 
         return filesStatsInBaseDir[file]
@@ -651,7 +669,7 @@ export function parseShellStatOutputToFsStats(shellStatOutput : string|string[],
                 return stat
             }
 
-            stat.file = matches[1]
+            stat.file = decodeFileName(matches[1])
             continue
         }
 
@@ -737,4 +755,13 @@ export function parseMultiFileStatsFromShellOutput(output: string|string[]): {[f
  */
 function splitIntoLines(content: string): string[]{
     return content.split("\n").map(x => x.trim()).filter(x => !!x)
+}
+
+/**
+ * 解码文件名
+ */
+function decodeFileName(filename: string): string{
+
+    
+    return filename
 }

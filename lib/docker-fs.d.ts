@@ -122,15 +122,18 @@ export declare class DockerContainer {
     });
     shellExec(cmd: string | string[]): Promise<ShellExecResult>;
     shellExecCached(cmd: string | string[], options?: {
-        timeout: number;
+        timeout?: number;
+        refresh?: boolean;
     }): Promise<ShellExecResult>;
     readFilesStatsInDir(dir: any, options?: {
-        timeout: number;
+        timeout?: number;
+        refresh?: boolean;
     }): Promise<{
         [path: string]: fs.Stats;
     }>;
     readFileStat(file: any, options?: {
-        timeout: number;
+        timeout?: number;
+        refresh?: boolean;
     }): Promise<fs.Stats>;
     download(containerFilePath: any, localFilePath: any): Promise<ShellExecResult>;
     upload(localFilePath: any, containerFilePath: any): Promise<ShellExecResult>;
