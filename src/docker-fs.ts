@@ -6,7 +6,8 @@ import Cache from './cache'
 import {shellExec, ShellExecOptions, ShellExecResult, shellEscape} from './shell'
 import * as stream from 'stream'
 
-const debug = require('debug')('docker-fs')
+const debug = require('debug')('docker-fs:debug')
+const warn  = require('debug')('docker-fs:warn')
 const child_proces = require('child_process')
 const writeFileAsync = cb2p(fs.writeFile.bind(fs))
 
@@ -432,8 +433,8 @@ export function readdir(path : string | Buffer, callback?: (err : NodeJS.ErrnoEx
     
     ~(async function () {
         if (isRoot(path)){
-            let res = await shellExec(['docker', 'ps', '--format', '{{.Names}}'])
-            callback(null, splitIntoLines(res.stdout))
+            let res = await dockerContainerManager.listAllContainers()
+            callback(null, res)
             return
         }
 
@@ -476,14 +477,14 @@ export class DockerContainer {
         
         let finalCmd = typeof cmd === 'string' ? cmd : cmd.map(x => shellEscape(x)).join(' ')
 
-        debug("[DockerContainer.ShellExec] " + cmd)
+        debug("[DockerContainer.ShellExec] %s", cmd)
 
         // 新建shell会比较快
         // let shell = await this._initShell()
         // return this._execInShell(shell, finalCmd)
 
         // 但是我们先测下每次都重建shell
-        return shellExec(['docker', 'exec', this.name].concat(cmd))
+        return shellExec([this.manager.dockerExecPath, 'exec', this.name].concat(cmd))
 
     }
 
@@ -516,7 +517,8 @@ export class DockerContainer {
             }
         }
 
-        let statCmd = 'stat ' + (dir + '/*').replace(/(^\/+)/, '/')
+        
+        let statCmd = `stat --printf='${STAT_MULTI_FORMAT}' ` + `'${dir}/'*`.replace(/^'\/+/, "'/")
         let result = this.shellExecCached(['sh', '-c', statCmd ], options)
                          .then(shExecStatResult => parseMultiFileStatsFromShellOutput(shExecStatResult.stdout))
 
@@ -529,6 +531,7 @@ export class DockerContainer {
         let baseDir = path.dirname(file).replace(/\\/g, '/')
         let filesStatsInBaseDir = await this.readFilesStatsInDir(baseDir, options)
         if (!filesStatsInBaseDir[file]){
+            warn("Cannot find stat of " + file)
             return new FsStats()
         }
 
@@ -536,11 +539,11 @@ export class DockerContainer {
     }
 
     async download(containerFilePath, localFilePath) {
-        return shellExec(['docker', 'cp', `${this.name}:${containerFilePath}`, localFilePath])
+        return shellExec([this.manager.dockerExecPath, 'cp', `${this.name}:${containerFilePath}`, localFilePath])
     }
 
     async upload(localFilePath, containerFilePath) {
-        return shellExec(['docker', 'cp', localFilePath, `${this.name}:${containerFilePath}`])
+        return shellExec([this.manager.dockerExecPath, 'cp', localFilePath, `${this.name}:${containerFilePath}`])
     }
 
     async dispose() {
@@ -560,7 +563,8 @@ export class DockerContainer {
  * docker容器的管理器
  */
 export class DockerContainerManager {
-    readonly containers:{[name:string]: DockerContainer} = {}
+    _containers: {[name:string]: DockerContainer} = {}
+    dockerExecPath: string = 'docker'
 
     parseDockerFsPath(path : string | Buffer) : [DockerContainer, string]{
         if (path instanceof Buffer){
@@ -586,17 +590,21 @@ export class DockerContainerManager {
     }
 
     getContainerByName(containerName: string): DockerContainer{
-        if (this.containers[containerName]){
-            return this.containers[containerName]
+        if (this._containers[containerName]){
+            return this._containers[containerName]
         }
 
-        return this.containers[containerName] = new DockerContainer({name: containerName, manager: this})
+        return this._containers[containerName] = new DockerContainer({name: containerName, manager: this})
     }
 
     unregister(containerName: string){
-        this.containers[containerName] = null
+        this._containers[containerName] = null
     }
 
+    async listAllContainers(){
+        let res = await shellExec([this.dockerExecPath, 'ps', '--format', '{{.Names}}'])
+        return splitIntoLines(res.stdout)
+    }
 }
 
 export const dockerContainerManager = new DockerContainerManager()
@@ -618,135 +626,135 @@ function generateTempFileName() : string {
     return tmp.tmpNameSync({dir: TempDirName})
 }
 
-//   File: '/etc/timezone'
-//   File: '/entrypoint.sh' -> 'usr/local/bin/docker-entrypoint.sh'
-const RE_file = /File: '(.+?)'/
 
-//  Size: 12              Blocks: 1          IO Block: 65536  regular file Size:
-// 0               Blocks: 28         IO Block: 65536  directory
-const RE_sizeBlockIoBlock = /Size: (\S+)\s+Blocks: (\S+)\s+IO Block: (\S+) (.+)$/
-
-// Device: ca127331h/3390206769d   Inode: 562949954291784  Links: 1
-const RE_deviceInodeLinks = /Device: (\S+)\s+Inode: (\S+)\s+Links: (\S+)/
-
-// Access: (0755/drwxr-xr-x)  Uid: (197616/clarence)   Gid: (197121/    None)
-// Access: (0644/-rw-r--r--)  Uid: (197616/clarence)   Gid: (197121/    None)
-const RE_accessUidGid = /Access:\s+\(\s*(\d+)\s*\/\S+\)\s+Uid:\s+\(\s*(\d+)\s*\/.+\)\s+Gid:\s+\(\s*(\d+)\s*\/.+\)/
-
-// Access: 2017-04-12 10:07:53.931248500 +0000
-const RE_accessTime = /Access:\s+\d{4}-\d{2}/
-
-// Modify: 2017-04-12 10:07:53.931248500 +0000
-const RE_modifyTime = /Modify:\s+\d{4}-\d{2}/
-
-// Change: 2017-04-12 10:07:53.931248500 +0000
-const RE_changeTime = /Change:\s+\d{4}-\d{2}/
-
-//  Birth: 2016-09-06 00:54:40.717559800 +0000
-const RE_birthTime = /Birth:\s+\d{4}-\d{2}/
-
-class ParsedFsStats extends FsStats{
-    _beginLineNo = 0  // 从几行开始的（含）
-    _endLineNo = 0    // 到几行结束的（不含）
+type StatTextLine = {
+    text: string
 }
 
+type StatFieldLine = {
+    field: string,
+    format: string,
+    sanitize?: (val: string) => number|string|null|Date
+}
+
+const sanitizeStatNumber = (val: string) => +val || 0;
+const sanitizeStatTime = (val: string) => ((t: Date) => t || null)(new Date(val));
+
 /**
- * 从单个stat的输出中解析出文件的状态(stat)
+ * stat 的 --format 参数的定义
  */
-export function parseShellStatOutputToFsStats(shellStatOutput : string|string[], beginLineNo: number=0) : fs.Stats {
-    let lines = typeof shellStatOutput === 'string' ? splitIntoLines(shellStatOutput) : shellStatOutput
+const STAT_MULTI_FORMAT_LINES_DEFINETIONS: Array<StatTextLine|StatFieldLine> = [
+    {
+        text: '======',
+    },
+    {
+        field: 'file',
+        format: '%n',
+    },
+    {
+        field: 'fileType',
+        format: '%F',
+    },
+    {
+        field: 'atime',
+        format: '%x',
+        sanitize: sanitizeStatTime,
+    },
+    {
+        field: 'mtime',
+        format: '%y',
+        sanitize: sanitizeStatTime,
+    },
+    {
+        field: 'ctime',
+        format: '%z',
+        sanitize: sanitizeStatTime,
+    },
+    {
+        field: 'size',
+        format: '%s',
+        sanitize: sanitizeStatNumber,
+    },
+    {
+        field: 'blocks',
+        format: '%b',
+        sanitize: sanitizeStatNumber,
+    },
+    {
+        field: 'blksize',
+        format: '%B',
+        sanitize: sanitizeStatNumber,
+    },
+    {
+        field: 'mode',
+        format: '%a',
+        sanitize: (val: string) => parseInt(val, 8) || 0,
+    },
+    {
+        field: 'nlink',
+        format: '%h',
+        sanitize: sanitizeStatNumber,
+    },
+];
 
-    let stat = new ParsedFsStats()
-    stat._beginLineNo = beginLineNo
+/**
+ * stat 的 --format 参数的 field => def 的映射
+ */
+const STAT_MULTI_FORMAT_LINES_DEFINETIONS_MAP: {[field:string]:StatTextLine|StatFieldLine} = STAT_MULTI_FORMAT_LINES_DEFINETIONS.reduce<any>(
+    (preValue, value) => {
+        preValue[value['field']] = value
+        return preValue
+    },
+    {}
+);
 
-    for (let lineNo = beginLineNo, linesNum = lines.length; lineNo < linesNum; lineNo++) {
-        let line = lines[lineNo]
-
-        let matches
-        if (matches = line.match(RE_file)){
-            if (stat.file){
-                stat._endLineNo = lineNo
-                return stat
-            }
-
-            stat.file = decodeFileName(matches[1])
-            continue
-        }
-
-        if (matches = line.match(RE_sizeBlockIoBlock)) {
-            stat.size = +matches[1] || 0
-            stat.blocks = +matches[2] || 0
-            stat.blksize = +matches[3] || 0
-            stat.fileType = matches[4].trim()
-            continue
-        }
-
-        if (matches = line.match(RE_deviceInodeLinks)) {
-            stat.dev = +matches[1] || 0
-            stat.ino = +matches[2] || 0
-            stat.nlink = +matches[3] || 0
-            continue
-        }
-
-        if (matches = line.match(RE_accessUidGid)) {
-            stat.mode = parseInt(matches[1], 8) || 0
-            stat.uid = +matches[2] || 0
-            stat.gid = +matches[3] || 0
-            continue
-        }
-
-        if ((matches = line.match(RE_accessTime))) {
-            stat.atime = new Date(line.replace('Access:', '').trim())
-            continue
-        }
-
-        if ((matches = line.match(RE_modifyTime))) {
-            stat.mtime = new Date(line.replace('Modify:', '').trim())
-            continue
-        }
-
-        if ((matches = line.match(RE_changeTime))) {
-            stat.ctime = new Date(line.replace('Change:', '').trim())
-            continue
-        }
-
-        if ((matches = line.match(RE_birthTime))) {
-            stat.birthtime = new Date(line.replace('Birth:', '').trim())
-            continue
-        }
+/**
+ * stat 的 --format 参数
+ */
+const STAT_MULTI_FORMAT = STAT_MULTI_FORMAT_LINES_DEFINETIONS.map(x => {
+    if ('text' in x){
+        return (x as StatTextLine).text
     }
 
-    // Make invalid time field be null    
-    ~['atime', 'mtime', 'ctime', 'birthtime'].forEach(field => {
-        if (stat[field] && !+ stat[field]) {
-            stat[field] = null
-        }
-    });
+    x = x as StatFieldLine
 
-    stat._endLineNo = lines.length
-    return stat
-}
+    return x.field + ':' + x.format
+}).join("\\n") + "\\n";
 
 /**
- * 从shell输出中解析多个文件的状态(stat)
+ * 从shell输出中解析出多个文件的状态
  */
-export function parseMultiFileStatsFromShellOutput(output: string|string[]): {[file:string]: fs.Stats} {
-    let lines = typeof output === 'string' ? splitIntoLines(output) : output
+function parseMultiFileStatsFromShellOutput(output: string): {[file:string]: fs.Stats}{
+    let fragments = output.split(STAT_MULTI_FORMAT_LINES_DEFINETIONS[0]['text'])
+    if (!fragments){
+        return {}
+    }
+
     let result: {[file:string]: fs.Stats} = {}
 
-    let stat : fs.Stats
-    let nextLineNo = 0
+    fragments.forEach(fragment => {
+        let stat = new FsStats()
+        let lines = splitIntoLines(fragment)
+        for (let line of lines){
+            let mpos = line.indexOf(':')
+            if (mpos <= 0){
+                continue;
+            }
 
-    do {
-        stat = parseShellStatOutputToFsStats(output, nextLineNo)
-        if (!(stat instanceof ParsedFsStats)){
-            throw new DockerFsError("Invalid parsed fs.Stats!", "ERROR")
+            let field = line.substring(0, mpos).trim()
+            let value = line.substring(mpos + 1).trim()
+            let fieldDef = STAT_MULTI_FORMAT_LINES_DEFINETIONS_MAP[field]
+            if (fieldDef && 'field' in fieldDef){
+                fieldDef = fieldDef as StatFieldLine
+                stat[field] = fieldDef.sanitize ? fieldDef.sanitize(value) : value
+            }
         }
 
-        nextLineNo = stat._endLineNo
-        result[stat.file] = stat
-    } while(stat._endLineNo < lines.length)
-    
+        if (stat.file) {
+            result[stat.file] = stat
+        }
+    })
+
     return result
 }
 
@@ -755,13 +763,4 @@ export function parseMultiFileStatsFromShellOutput(output: string|string[]): {[f
  */
 function splitIntoLines(content: string): string[]{
     return content.split("\n").map(x => x.trim()).filter(x => !!x)
-}
-
-/**
- * 解码文件名
- */
-function decodeFileName(filename: string): string{
-
-    
-    return filename
 }

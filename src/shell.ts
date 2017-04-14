@@ -1,4 +1,5 @@
 import * as child_process from 'child_process'
+import * as path from 'path'
 
 const debug = require('debug')('shell')
 
@@ -37,12 +38,12 @@ export async function shellExec(cmd: string|string[], options?: ShellExecOptions
 
     let execCmd = cmd + ' ' + args.join(' ')
 
-    debug(`ShellExec: ${execCmd}`)
+    debug(`ShellExec: %s`, execCmd)
 
     return new Promise<ShellExecResult>(function(resolve, reject){
         let retCode: number|void = null
         let shellProc = child_process.exec(execCmd, options, function(err, stdout, stderr){
-            debug(`[${execCmd}]: end:\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}\n   => ` , {err, retCode})
+            debug(`[%s]: end:\nSTDOUT:\n%s\nSTDERR:\n%s\n   => `, execCmd, stdout, stderr , {err, retCode})
 
             if (err){
                 reject(err)
@@ -66,7 +67,7 @@ export async function shellExec(cmd: string|string[], options?: ShellExecOptions
         })
 
         shellProc.on('exit', function(code, signal){
-            debug(`[${execCmd}]: exit with code: `, code)
+            debug(`[%s]: exit with code: %s`, execCmd, code)
             retCode = code
         })
     })
@@ -78,12 +79,16 @@ export async function shellExec(cmd: string|string[], options?: ShellExecOptions
  * @param arg 
  * @param allowValAndEval 
  */
-export function shellEscape(arg: string, allowValAndEval:boolean=true){
-    arg = arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+export function shellEscape(arg: string, allowValAndEval:boolean=false){
+    if (path.sep === '/'){
+        arg = arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 
-    if (!allowValAndEval){
-        arg = arg.replace(/`/g, '\\`').replace(/\$/g, '\\$')
+        if (!allowValAndEval){
+            arg = arg.replace(/`/g, '\\`').replace(/\$/g, '\\$')
+        }
+
+        return '"' + arg + '"'
+    } else {
+        return '"' + arg + '"'
     }
-
-    return '"' + arg + '"'
 }

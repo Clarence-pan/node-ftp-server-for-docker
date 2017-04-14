@@ -145,21 +145,13 @@ export declare class DockerContainer {
  * docker容器的管理器
  */
 export declare class DockerContainerManager {
-    readonly containers: {
+    _containers: {
         [name: string]: DockerContainer;
     };
+    dockerExecPath: string;
     parseDockerFsPath(path: string | Buffer): [DockerContainer, string];
     getContainerByName(containerName: string): DockerContainer;
     unregister(containerName: string): void;
+    listAllContainers(): Promise<string[]>;
 }
 export declare const dockerContainerManager: DockerContainerManager;
-/**
- * 从单个stat的输出中解析出文件的状态(stat)
- */
-export declare function parseShellStatOutputToFsStats(shellStatOutput: string | string[], beginLineNo?: number): fs.Stats;
-/**
- * 从shell输出中解析多个文件的状态(stat)
- */
-export declare function parseMultiFileStatsFromShellOutput(output: string | string[]): {
-    [file: string]: fs.Stats;
-};
