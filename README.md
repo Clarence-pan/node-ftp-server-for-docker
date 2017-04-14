@@ -1,7 +1,5 @@
 # ES6 string HTML template 
 
-**DEVELOPING**
-
 这是一个 docker 专用的 FTP 服务器 - 允许通过 FTP 协议来访问 docker 容器中的文件（即使 docker 容器已经启动了也可以的哟）。基于 linux shell `sh` 和 docker 的 `docker cp`.
 
 It is a ftp server for docker - allow accessing files in docker containers even when container already started. Based on `sh` and `docker cp`.
@@ -28,6 +26,12 @@ It is a ftp server for docker - allow accessing files in docker containers even 
 [snyk-url]: https://snyk.io/test/npm/ftp-server-for-docker
 [download-image]: https://img.shields.io/npm/dm/ftp-server-for-docker.svg?style=flat-square
 [download-url]: https://npmjs.org/package/ftp-server-for-docker
+
+## 运行依赖 Requirements
+
+- [x] Node.js <= 5.x      - Not tested
+- [√] Node.js 6.x         - Tested
+- [x] Node.js >= 7.x      - Not tested
 
 ## 安装 Install
 
