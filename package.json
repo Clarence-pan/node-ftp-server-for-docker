@@ -1,11 +1,11 @@
 {
   "name": "ftp-server-for-docker",
-  "version": "0.0.3",
+  "version": "1.0.0",
   "description": "A ftp server for docker - allow accessing files in docker containers even when container already started. Based on sh and docker cp.",
   "main": "index.js",
   "scripts": {
-    "build": "./node_modules/.bin/tsc -p . && echo OK.",
-    "watch": "./node_modules/.bin/tsc -p . --watch",
+    "build": "./node_modules/.bin/tsc --project . && echo OK.",
+    "watch": "./node_modules/.bin/tsc --project . --watch",
     "test": "mocha",
     "coverage": "istanbul cover ./node_modules/mocha/bin/_mocha"
   },
@@ -22,15 +22,10 @@
   "files": [
     "index.js",
     "cli.js",
-    "extract-es-module.js",
     "lib/ftp-server.js",
     "lib/ftp-server.d.ts",
-    "lib/fs/abstract.js",
-    "lib/fs/abstract.d.ts",
-    "lib/fs/docker.js",
-    "lib/fs/docker.d.ts",
-    "lib/fs/system.js",
-    "lib/fs/system.d.ts",
+    "lib/docker-fs.js",
+    "lib/docker-fs.d.ts",
     "lib/cli.js",
     "lib/cli.d.ts"
   ],
@@ -51,6 +46,7 @@
     "babel-preset-stage-2": "^6.24.1",
     "co": "^4.6.0",
     "ftp": "^0.3.10",
+    "glob": "^7.1.1",
     "intelli-espower-loader": "^1.0.1",
     "istanbul": "^0.4.5",
     "mocha": "^3.2.0",
@@ -59,6 +55,9 @@
   },
   "dependencies": {
     "bluebird": "^3.5.0",
-    "cb2p": "^1.1.0"
+    "cb2p": "^1.1.0",
+    "ftpd": "^0.2.15",
+    "tmp": "0.0.31",
+    "yargs": "^7.1.0"
   }
 }

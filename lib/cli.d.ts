@@ -1,2 +1,2 @@
-declare var _default: () => void;
+declare var _default: (argv?: string[]) => void;
 export = _default;
