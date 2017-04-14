@@ -1,6 +1,6 @@
 {
   "name": "ftp-server-for-docker",
-  "version": "0.0.3",
+  "version": "1.0.0",
   "description": "A ftp server for docker - allow accessing files in docker containers even when container already started. Based on sh and docker cp.",
   "main": "index.js",
   "scripts": {
