@@ -1,10 +1,40 @@
 /// <reference types="node" />
 import * as fs from 'fs';
+import Cache from './cache';
 import { ShellExecResult } from './shell';
 import * as stream from 'stream';
 export declare class DockerFsError extends Error {
     code: string | number;
     constructor(msg: string, code: string | number);
+}
+export declare class FsStats implements fs.Stats {
+    dev: number;
+    ino: number;
+    mode: number;
+    nlink: number;
+    uid: number;
+    gid: number;
+    rdev: number;
+    size: number;
+    blksize: number;
+    blocks: number;
+    atime: Date | null;
+    mtime: Date | null;
+    ctime: Date | null;
+    birthtime: Date | null;
+    file: string;
+    fileType: string;
+    static FILE_TYPE_FILE: string;
+    static FILE_TYPE_DIRECTORY: string;
+    static FILE_TYPE_SYM_LINK: string;
+    isFile(): boolean;
+    isDirectory(): boolean;
+    isBlockDevice(): boolean;
+    isCharacterDevice(): boolean;
+    isSymbolicLink(): boolean;
+    isFIFO(): boolean;
+    isSocket(): boolean;
+    static create(init: (obj: FsStats) => any): FsStats;
 }
 /**
  * Asynchronous stat - get the file stats of {path}
@@ -82,11 +112,26 @@ export declare function isRoot(path: string | Buffer): boolean;
 export declare class DockerContainer {
     name: string;
     manager: DockerContainerManager;
+    _dirStatCache: Cache<Promise<{
+        [path: string]: fs.Stats;
+    }>>;
+    _execCache: Cache<ShellExecResult | Promise<ShellExecResult>>;
     constructor(options: {
         name: string;
         manager: DockerContainerManager;
     });
     shellExec(cmd: string | string[]): Promise<ShellExecResult>;
+    shellExecCached(cmd: string | string[], options?: {
+        timeout: number;
+    }): Promise<ShellExecResult>;
+    readFilesStatsInDir(dir: any, options?: {
+        timeout: number;
+    }): Promise<{
+        [path: string]: fs.Stats;
+    }>;
+    readFileStat(file: any, options?: {
+        timeout: number;
+    }): Promise<fs.Stats>;
     download(containerFilePath: any, localFilePath: any): Promise<ShellExecResult>;
     upload(localFilePath: any, containerFilePath: any): Promise<ShellExecResult>;
     dispose(): Promise<void>;
@@ -105,4 +150,13 @@ export declare class DockerContainerManager {
     unregister(containerName: string): void;
 }
 export declare const dockerContainerManager: DockerContainerManager;
-export declare function parseShellStatOutputToFsStats(shellStatOutput: string): fs.Stats;
+/**
+ * 从单个stat的输出中解析出文件的状态(stat)
+ */
+export declare function parseShellStatOutputToFsStats(shellStatOutput: string | string[], beginLineNo?: number): fs.Stats;
+/**
+ * 从shell输出中解析多个文件的状态(stat)
+ */
+export declare function parseMultiFileStatsFromShellOutput(output: string | string[]): {
+    [file: string]: fs.Stats;
+};

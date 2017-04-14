@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as cb2p from 'cb2p'
 import * as path from 'path'
 import * as tmp from 'tmp'
+import Cache from './cache'
 import {shellExec, ShellExecOptions, ShellExecResult, shellEscape} from './shell'
 import * as stream from 'stream'
 
@@ -18,6 +19,63 @@ export class DockerFsError extends Error{
     }
 }
 
+export class FsStats implements fs.Stats{
+        dev = 0
+        ino = 0
+        mode = 0
+        nlink = 0
+        uid = 0
+        gid = 0
+        rdev = 0
+        size = 0
+        blksize = 0
+        blocks = 0
+        atime: Date|null = null
+        mtime: Date|null = null
+        ctime: Date|null = null
+        birthtime: Date|null = null
+        file: string = ''
+        fileType: string = ''
+
+        static FILE_TYPE_FILE = 'file'
+        static FILE_TYPE_DIRECTORY = 'directory'
+        static FILE_TYPE_SYM_LINK = 'symbolic link'
+
+        isFile(): boolean{
+            return /file/.test(this.fileType)
+        }
+
+        isDirectory(): boolean{
+            return this.fileType === FsStats.FILE_TYPE_DIRECTORY
+        }
+
+        isBlockDevice(): boolean{
+            return false
+        }
+
+        isCharacterDevice(): boolean{
+            return false
+        }
+
+        isSymbolicLink(): boolean{
+            return this.fileType === FsStats.FILE_TYPE_SYM_LINK
+        }
+
+        isFIFO(): boolean{
+            return false
+        }
+
+        isSocket(): boolean{
+            return false
+        }
+
+        static create(init: (obj: FsStats) => any): FsStats{
+            let stats = new FsStats()
+            init(stats)
+            return stats
+        }
+}
+
 /**
  * Asynchronous stat - get the file stats of {path}
  *
@@ -29,41 +87,26 @@ export function stat(path : string | Buffer, callback?: (err : Error, stats : fs
     debug('stat ', path)
 
     if (isRoot(path)){
-        callback(null, {
-            isFile: () => false,
-            isDirectory: () => true,
-            isBlockDevice: () => false,
-            isCharacterDevice: () => false,
-            isSymbolicLink: () => false,
-            isFIFO: () => false,
-            isSocket: () => false,
-            dev: 0,
-            ino: 0,
-            mode: 0,
-            nlink: 0,
-            uid: 0,
-            gid: 0,
-            rdev: 0,
-            size: 0,
-            blksize: 0,
-            blocks: 0,
-            atime: new Date('1970-01-01'),
-            mtime: new Date('1970-01-01'),
-            ctime: new Date('1970-01-01'),
-            birthtime: new Date('1970-01-01')
-        })
+        callback(null, FsStats.create(stat => {
+            stat.fileType = FsStats.FILE_TYPE_DIRECTORY
+            stat.atime = stat.mtime = stat.ctime = stat.birthtime = new Date('1970-01-01')
+        }))
         return
     }
     
     ~(async function () {
         // 1. 转换路径
         let [container, pathInContainer] = dockerContainerManager.parseDockerFsPath(path)
+        if (isRoot(pathInContainer)){
+            callback(null, FsStats.create(stat => {
+                stat.fileType = FsStats.FILE_TYPE_DIRECTORY
+                stat.atime = stat.mtime = stat.ctime = stat.birthtime = new Date('1970-01-01')
+            }))
+            return
+        }
 
         // 2. 通过sh运行 stat
-        let res = await container.shellExec(['stat', pathInContainer])
-
-        // 3. 解析结果
-        let stats = parseShellStatOutputToFsStats(res.stdout)
+        let stats = await container.readFileStat(pathInContainer)
 
         callback(null, stats)
     })().catch(err => callback(err as Error, null))
@@ -387,6 +430,8 @@ export function readdir(path : string | Buffer, callback?: (err : NodeJS.ErrnoEx
         // 2. 执行shell删除目录
         let res = await container.shellExec(['ls', '-1', '--color=none', pathInContainer])
 
+        container.readFilesStatsInDir(pathInContainer, {timeout: 3000})
+
         callback(null, splitIntoLines(res.stdout))
     })().catch(err => callback(err as Error, []))
 }
@@ -399,13 +444,17 @@ export function isRoot(path: string|Buffer){
     return path === '/' || path === '\\'
 }
 
-
 export class DockerContainer {
     name: string
     manager: DockerContainerManager
+    _dirStatCache: Cache<Promise<{[path:string]: fs.Stats}>>
+    _execCache: Cache<ShellExecResult | Promise<ShellExecResult>>
+
     constructor(options: {name: string, manager: DockerContainerManager}){
         this.name = options.name
         this.manager = options.manager
+        this._dirStatCache = new Cache<Promise<{[path:string]: fs.Stats}>>()
+        this._execCache = new Cache<ShellExecResult | Promise<ShellExecResult>>()
     }
 
     async shellExec(cmd : string | string[]) : Promise < ShellExecResult > {
@@ -423,6 +472,49 @@ export class DockerContainer {
         // 但是我们先测下每次都重建shell
         return shellExec(['docker', 'exec', this.name].concat(cmd))
 
+    }
+
+    async shellExecCached(cmd: string | string[], options?: {timeout: number}): Promise<ShellExecResult>{
+        let cacheKey = Array.isArray(cmd) ? cmd.join(' ') : cmd
+        let cachedResult = this._execCache.get(cacheKey)
+        if (cachedResult){
+            return cachedResult
+        }
+
+        options = {timeout: 3000, ...(options || {})}
+
+        let result = this.shellExec(cmd)
+        this._execCache.set(cacheKey, result, options.timeout)
+
+        return result
+    }
+
+    async readFilesStatsInDir(dir, options?: {timeout: number}): Promise<{[path:string]: fs.Stats}>{
+        let cacheKey = dir
+        let cachedResult = this._dirStatCache.get(cacheKey)
+        if (cachedResult){
+            return cachedResult
+        }
+
+        options = {timeout: 3000, ...(options || {})}
+
+        let statCmd = 'stat ' + (dir + '/*').replace(/(^\/+)/, '/')
+        let result = this.shellExecCached(['sh', '-c', statCmd ], options)
+                         .then(shExecStatResult => parseMultiFileStatsFromShellOutput(shExecStatResult.stdout))
+
+        this._dirStatCache.set(cacheKey, result, options.timeout)
+
+        return result
+    }
+
+    async readFileStat(file, options?: {timeout: number}): Promise<fs.Stats>{
+        let baseDir = path.dirname(file).replace(/\\/g, '/')
+        let filesStatsInBaseDir = await this.readFilesStatsInDir(baseDir, options)
+        if (!filesStatsInBaseDir[file]){
+            throw new DockerFsError(`File ${file} not found in ${baseDir}!`, 'ENOET')
+        }
+
+        return filesStatsInBaseDir[file]
     }
 
     async download(containerFilePath, localFilePath) {
@@ -444,8 +536,6 @@ export class DockerContainer {
     async _execInShell(shell, cmd) : Promise < ShellExecResult >{
         throw new Error("todo...")
     }
-
-
 }
 
 /**
@@ -510,6 +600,10 @@ function generateTempFileName() : string {
     return tmp.tmpNameSync({dir: TempDirName})
 }
 
+//   File: '/etc/timezone'
+//   File: '/entrypoint.sh' -> 'usr/local/bin/docker-entrypoint.sh'
+const RE_file = /File: '(.+?)'/
+
 //  Size: 12              Blocks: 1          IO Block: 65536  regular file Size:
 // 0               Blocks: 28         IO Block: 65536  directory
 const RE_sizeBlockIoBlock = /Size: (\S+)\s+Blocks: (\S+)\s+IO Block: (\S+) (.+)$/
@@ -533,43 +627,39 @@ const RE_changeTime = /Change:\s+\d{4}-\d{2}/
 //  Birth: 2016-09-06 00:54:40.717559800 +0000
 const RE_birthTime = /Birth:\s+\d{4}-\d{2}/
 
-export function parseShellStatOutputToFsStats(shellStatOutput : string) : fs.Stats {
-    let lines = splitIntoLines(shellStatOutput)
+class ParsedFsStats extends FsStats{
+    _beginLineNo = 0  // 从几行开始的（含）
+    _endLineNo = 0    // 到几行结束的（不含）
+}
 
-    let stat: fs.Stats = {
-        isFile: () => false,
-        isDirectory: () => false,
-        isBlockDevice: () => false,
-        isCharacterDevice: () => false,
-        isSymbolicLink: () => false,
-        isFIFO: () => false,
-        isSocket: () => false,
-        dev: 0,
-        ino: 0,
-        mode: 0,
-        nlink: 0,
-        uid: 0,
-        gid: 0,
-        rdev: 0,
-        size: 0,
-        blksize: 0,
-        blocks: 0,
-        atime: null,
-        mtime: null,
-        ctime: null,
-        birthtime: null
-    }
+/**
+ * 从单个stat的输出中解析出文件的状态(stat)
+ */
+export function parseShellStatOutputToFsStats(shellStatOutput : string|string[], beginLineNo: number=0) : fs.Stats {
+    let lines = typeof shellStatOutput === 'string' ? splitIntoLines(shellStatOutput) : shellStatOutput
 
-    for (let line of lines) {
+    let stat = new ParsedFsStats()
+    stat._beginLineNo = beginLineNo
+
+    for (let lineNo = beginLineNo, linesNum = lines.length; lineNo < linesNum; lineNo++) {
+        let line = lines[lineNo]
+
         let matches
+        if (matches = line.match(RE_file)){
+            if (stat.file){
+                stat._endLineNo = lineNo
+                return stat
+            }
+
+            stat.file = matches[1]
+            continue
+        }
+
         if (matches = line.match(RE_sizeBlockIoBlock)) {
             stat.size = +matches[1] || 0
             stat.blocks = +matches[2] || 0
             stat.blksize = +matches[3] || 0
-
-            let fileType = matches[4].trim()
-            stat.isFile = () => /file/.test(fileType)
-            stat.isDirectory = () => fileType === 'directory'
+            stat.fileType = matches[4].trim()
             continue
         }
 
@@ -615,9 +705,36 @@ export function parseShellStatOutputToFsStats(shellStatOutput : string) : fs.Sta
         }
     });
 
+    stat._endLineNo = lines.length
     return stat
 }
 
+/**
+ * 从shell输出中解析多个文件的状态(stat)
+ */
+export function parseMultiFileStatsFromShellOutput(output: string|string[]): {[file:string]: fs.Stats} {
+    let lines = typeof output === 'string' ? splitIntoLines(output) : output
+    let result: {[file:string]: fs.Stats} = {}
+
+    let stat : fs.Stats
+    let nextLineNo = 0
+
+    do {
+        stat = parseShellStatOutputToFsStats(output, nextLineNo)
+        if (!(stat instanceof ParsedFsStats)){
+            throw new DockerFsError("Invalid parsed fs.Stats!", "ERROR")
+        }
+
+        nextLineNo = stat._endLineNo
+        result[stat.file] = stat
+    } while(stat._endLineNo < lines.length)
+    
+    return result
+}
+
+/**
+ * 将一段文本拆成单行的数组，空白行将被忽略
+ */
 function splitIntoLines(content: string): string[]{
     return content.split("\n").map(x => x.trim()).filter(x => !!x)
 }
