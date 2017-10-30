@@ -1,4 +1,4 @@
-# ES6 string HTML template 
+# Node FTP Server For Docker
 
 这是一个 docker 专用的 FTP 服务器 - 允许通过 FTP 协议来访问 docker 容器中的文件（即使 docker 容器已经启动了也可以的哟）。基于 linux shell `sh` 和 docker 的 `docker cp`.
 
